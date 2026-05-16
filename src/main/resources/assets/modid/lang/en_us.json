@@ -1,0 +1,9 @@
+{
+  "category.modid": "Media Browser",
+  "key.modid.open_browser": "Open Media Browser",
+  "key.modid.close_background_browser": "Close Background Media Browser",
+  "key.modid.previous_video": "Previous Track/Video",
+  "key.modid.play_pause_video": "Play/Pause Track/Video",
+  "key.modid.next_video": "Next Track/Video",
+  "key.modid.toggle_media_share": "Toggle Media Share"
+}

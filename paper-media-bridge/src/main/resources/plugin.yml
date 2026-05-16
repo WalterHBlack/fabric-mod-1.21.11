@@ -1,0 +1,11 @@
+name: MediaBridge
+version: ${version}
+main: com.example.mediabridge.MediaBridgePlugin
+api-version: '1.21'
+author: egege
+description: Proximity media sync bridge for modid clients
+commands:
+  media:
+    description: Controls proximity media sharing
+    usage: /media <share|radius|status>
+

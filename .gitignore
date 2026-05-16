@@ -38,3 +38,11 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+
+# local temp captures
+tmp-video-frames/
+tmp-video-frames-140811/
+
+# paper plugin local build artifacts
+paper-media-bridge/.gradle/
+paper-media-bridge/build/
