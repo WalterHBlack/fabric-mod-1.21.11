@@ -586,6 +586,58 @@ public class YouTubeBrowserScreen extends Screen {
 				    window.__mcSpotifyCompat = true;
 				    console.warn("[MC-Spotify] compat init");
 				
+				    // Spoof desktop chromium signals for Spotify's frontend gating.
+				    try {
+				      const desktopUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+				      const navProto = Object.getPrototypeOf(navigator);
+				      const spoof = (proto, key, getter) => {
+				        try {
+				          const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+				          if (!descriptor || descriptor.configurable) {
+				            Object.defineProperty(proto, key, { configurable: true, get: getter });
+				          }
+				        } catch (e) {}
+				      };
+				      spoof(navProto, "userAgent", () => desktopUa);
+				      spoof(navProto, "platform", () => "Win32");
+				      spoof(navProto, "maxTouchPoints", () => 0);
+				      spoof(navProto, "webdriver", () => undefined);
+				
+				      if (navigator.userAgentData) {
+				        const uaData = {
+				          brands: [
+				            { brand: "Chromium", version: "136" },
+				            { brand: "Google Chrome", version: "136" },
+				            { brand: "Not.A/Brand", version: "24" }
+				          ],
+				          mobile: false,
+				          platform: "Windows",
+				          getHighEntropyValues: async (hints) => {
+				            const out = {};
+				            for (const hint of (hints || [])) {
+				              if (hint === "platform") out.platform = "Windows";
+				              if (hint === "platformVersion") out.platformVersion = "15.0.0";
+				              if (hint === "architecture") out.architecture = "x86";
+				              if (hint === "bitness") out.bitness = "64";
+				              if (hint === "model") out.model = "";
+				              if (hint === "uaFullVersion") out.uaFullVersion = "136.0.0.0";
+				              if (hint === "fullVersionList") out.fullVersionList = uaData.brands.map((b) => ({ brand: b.brand, version: "136.0.0.0" }));
+				            }
+				            return out;
+				          }
+				        };
+				        try {
+				          Object.defineProperty(navigator, "userAgentData", { configurable: true, get: () => uaData });
+				        } catch (e) {}
+				      }
+				
+				      if (!sessionStorage.getItem("__mc_spotify_ua_boot")) {
+				        sessionStorage.setItem("__mc_spotify_ua_boot", "1");
+				        location.reload();
+				        return;
+				      }
+				    } catch (e) {}
+				
 				    const installMediaWatch = (media) => {
 				      if (!media || media.__mcSpotifyWatch) return;
 				      media.__mcSpotifyWatch = true;
