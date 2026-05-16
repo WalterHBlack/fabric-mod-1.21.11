@@ -53,6 +53,7 @@ public class YouTubeBrowserScreen extends Screen {
 	private static final String YOUTUBE_MUSIC_URL = "https://music.youtube.com";
 	private static final String SPOTIFY_URL = "https://open.spotify.com";
 	private static final String APPLE_MUSIC_URL = "https://music.apple.com";
+	private static final double SPOTIFY_DESKTOP_LAYOUT_ZOOM = -2.0D;
 	private static final String DEFAULT_URL = YOUTUBE_URL;
 	private static final String BLANK_URL = "about:blank";
 	private static final int BACKGROUND_KEEP_ALIVE_INTERVAL_TICKS = 40;
@@ -83,6 +84,8 @@ public class YouTubeBrowserScreen extends Screen {
 	private static final Map<String, String> mediaTitleCache = new HashMap<>();
 	private static long mediaChangePopupHideAtMs;
 	private static long spotifyCompatLastInjectMs;
+	private static boolean spotifyDesktopZoomApplied;
+	private static double spotifyDesktopZoomPreviousLevel;
 	private static boolean backgroundLowPowerApplied;
 	private static int backgroundLowPowerPixelWidth = -1;
 	private static int backgroundLowPowerPixelHeight = -1;
@@ -720,6 +723,25 @@ public class YouTubeBrowserScreen extends Screen {
 				currentUrl,
 				0
 		);
+	}
+
+	private static void applySpotifyDesktopZoomIfNeeded(MCEFBrowser targetBrowser, String currentUrl) {
+		if (targetBrowser == null) {
+			return;
+		}
+		if (isSpotifyUrl(currentUrl)) {
+			if (spotifyDesktopZoomApplied) {
+				return;
+			}
+			spotifyDesktopZoomPreviousLevel = targetBrowser.getZoomLevel();
+			targetBrowser.setZoomLevel(SPOTIFY_DESKTOP_LAYOUT_ZOOM);
+			spotifyDesktopZoomApplied = true;
+			return;
+		}
+		if (spotifyDesktopZoomApplied) {
+			targetBrowser.setZoomLevel(spotifyDesktopZoomPreviousLevel);
+			spotifyDesktopZoomApplied = false;
+		}
 	}
 
 	private static void applyBackgroundLowPowerResize(Minecraft client) {
@@ -1485,6 +1507,7 @@ public class YouTubeBrowserScreen extends Screen {
 			return;
 		}
 		String currentUrl = sharedBrowser.getURL();
+		applySpotifyDesktopZoomIfNeeded(sharedBrowser, currentUrl);
 		trackMediaChange(client, currentUrl);
 		boolean spotifyPage = isSpotifyUrl(currentUrl);
 		applyBackgroundLowPowerResize(client);
@@ -1577,6 +1600,10 @@ public class YouTubeBrowserScreen extends Screen {
 		if (sharedBrowser != null) {
 			String currentUrl = sharedBrowser.getURL();
 			persistLastUrlIfValid(currentUrl);
+			if (spotifyDesktopZoomApplied) {
+				sharedBrowser.setZoomLevel(spotifyDesktopZoomPreviousLevel);
+				spotifyDesktopZoomApplied = false;
+			}
 			sharedBrowser.executeJavaScript(
 					"""
 					for (const media of document.querySelectorAll('video, audio')) {
@@ -1617,6 +1644,10 @@ public class YouTubeBrowserScreen extends Screen {
 		if (sharedBrowser != null) {
 			String currentUrl = sharedBrowser.getURL();
 			persistLastUrlIfValid(currentUrl);
+			if (spotifyDesktopZoomApplied) {
+				sharedBrowser.setZoomLevel(spotifyDesktopZoomPreviousLevel);
+				spotifyDesktopZoomApplied = false;
+			}
 			sharedBrowser.setFocus(false);
 			sharedBrowser.setWindowVisibility(false);
 			sharedBrowser.close();
@@ -2018,6 +2049,7 @@ public class YouTubeBrowserScreen extends Screen {
 		refreshNavigationState();
 		if (browser != null) {
 			String currentUrl = browser.getURL();
+			applySpotifyDesktopZoomIfNeeded(browser, currentUrl);
 			if (isSecurityInterstitialUrl(currentUrl)) {
 				if (!secureErrorRetryDone && !lastSecureNavigationUrl.isBlank()) {
 					long now = System.currentTimeMillis();
