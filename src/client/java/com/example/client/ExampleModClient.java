@@ -62,7 +62,6 @@ public class ExampleModClient implements ClientModInitializer {
 	private static final int MENU_TAB_OPTION_HEIGHT = 18;
 	private static final int MENU_TAB_MARGIN = 6;
 	private static final int MENU_TAB_SPACING = 3;
-	private static final String CHROME_UA_OVERRIDE = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 	private static final String WIDEVINE_DLL_NAME = "widevinecdm.dll";
 	private static final String WIDEVINE_HINT_FILE_NAME = "latest-component-updated-widevine-cdm";
 
@@ -517,13 +516,6 @@ public class ExampleModClient implements ClientModInitializer {
 	private static void applyMcefPlaybackCompatibilitySettings() {
 		try {
 			bootstrapWidevineForMcef();
-			// Keep UA forced to a modern desktop Chrome every startup.
-			// Some login providers (Google) are sensitive to stale/embedded-looking UA values.
-			String configuredUa = MCEF.getSettings().getUserAgent();
-			if (configuredUa == null || configuredUa.isBlank() || !CHROME_UA_OVERRIDE.equals(configuredUa)) {
-				MCEF.getSettings().setUserAgent(CHROME_UA_OVERRIDE);
-				ExampleMod.LOGGER.info("MCEF: applied modern Chrome user-agent override for media compatibility.");
-			}
 			if (MCEF.getSettings().isDisableWebSecurity()) {
 				MCEF.getSettings().setDisableWebSecurity(false);
 				ExampleMod.LOGGER.info("MCEF: set cef-disable-web-security=false for DRM compatibility.");
