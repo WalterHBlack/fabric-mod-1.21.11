@@ -668,6 +668,30 @@ public class YouTubeBrowserScreen extends Screen {
 				          return;
 				        }
 				      }
+				
+				      // Hard-force desktop-like layout width, then scale down to fit MC window.
+				      try {
+				        const targetWidth = 1366;
+				        const viewportWidth = Math.max(320, window.innerWidth || document.documentElement.clientWidth || 320);
+				        const scale = Math.max(0.5, Math.min(1, viewportWidth / targetWidth));
+				        document.documentElement.style.setProperty("--mc-spotify-scale", String(scale));
+				        if (!document.getElementById("__mcSpotifyDesktopStyle")) {
+				          const style = document.createElement("style");
+				          style.id = "__mcSpotifyDesktopStyle";
+				          style.textContent = `
+				            html, body { min-width: ${targetWidth}px !important; }
+				            body {
+				              zoom: var(--mc-spotify-scale) !important;
+				              width: calc(100% / var(--mc-spotify-scale)) !important;
+				              overflow-x: hidden !important;
+				            }
+				            #main {
+				              min-width: ${targetWidth}px !important;
+				            }
+				          `;
+				          document.head && document.head.appendChild(style);
+				        }
+				      } catch (e) {}
 				    } catch (e) {}
 				
 				    const installMediaWatch = (media) => {
