@@ -516,18 +516,6 @@ public class ExampleModClient implements ClientModInitializer {
 	private static void applyMcefPlaybackCompatibilitySettings() {
 		try {
 			bootstrapWidevineForMcef();
-			if (MCEF.getSettings().isDisableWebSecurity()) {
-				MCEF.getSettings().setDisableWebSecurity(false);
-				ExampleMod.LOGGER.info("MCEF: set cef-disable-web-security=false for DRM compatibility.");
-			}
-			if (!MCEF.getSettings().isEnableWidevineCdm()) {
-				MCEF.getSettings().setEnableWidevineCdm(true);
-				ExampleMod.LOGGER.info("MCEF: ensured widevine is enabled.");
-			}
-			if (MCEF.getSettings().getConsoleLogForwardingMinSeverity() == org.cef.CefSettings.LogSeverity.LOGSEVERITY_DISABLE) {
-				MCEF.getSettings().setConsoleLogForwardingMinSeverity(org.cef.CefSettings.LogSeverity.LOGSEVERITY_INFO);
-				ExampleMod.LOGGER.info("MCEF: enabled CEF console log forwarding (INFO) for media debugging.");
-			}
 		} catch (Exception exception) {
 			ExampleMod.LOGGER.warn("Failed to apply MCEF playback compatibility settings: {}", exception.toString());
 		}
