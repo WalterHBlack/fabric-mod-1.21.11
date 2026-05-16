@@ -639,6 +639,35 @@ public class YouTubeBrowserScreen extends Screen {
 				        location.reload();
 				        return;
 				      }
+				
+				      // Force desktop media-query branch on narrow MC windows.
+				      if (!window.__mcSpotifyDesktopMqPatched && typeof window.matchMedia === "function") {
+				        const originalMatchMedia = window.matchMedia.bind(window);
+				        window.matchMedia = (query) => {
+				          const result = originalMatchMedia(query);
+				          const q = (query || "").toString().toLowerCase();
+				          const forceDesktop = q.includes("max-width")
+				            ? false
+				            : (q.includes("min-width") ? true : result.matches);
+				          return {
+				            matches: forceDesktop,
+				            media: result.media,
+				            onchange: result.onchange,
+				            addListener: (cb) => result.addListener ? result.addListener(cb) : undefined,
+				            removeListener: (cb) => result.removeListener ? result.removeListener(cb) : undefined,
+				            addEventListener: (...args) => result.addEventListener ? result.addEventListener(...args) : undefined,
+				            removeEventListener: (...args) => result.removeEventListener ? result.removeEventListener(...args) : undefined,
+				            dispatchEvent: (...args) => result.dispatchEvent ? result.dispatchEvent(...args) : false
+				          };
+				        };
+				        window.__mcSpotifyDesktopMqPatched = true;
+				
+				        if (!sessionStorage.getItem("__mc_spotify_mq_boot")) {
+				          sessionStorage.setItem("__mc_spotify_mq_boot", "1");
+				          location.reload();
+				          return;
+				        }
+				      }
 				    } catch (e) {}
 				
 				    const installMediaWatch = (media) => {
