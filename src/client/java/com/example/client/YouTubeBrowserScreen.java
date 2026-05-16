@@ -89,7 +89,6 @@ public class YouTubeBrowserScreen extends Screen {
 	private static String lastSecureNavigationUrl = "";
 	private static boolean secureErrorRetryDone;
 	private static long secureErrorFirstSeenAtMs;
-	private static boolean googleRejectedAutoHandled;
 	private static boolean sessionLoaded;
 
 	private final boolean showMainMenuButton;
@@ -564,7 +563,6 @@ public class YouTubeBrowserScreen extends Screen {
 		lastSecureNavigationUrl = url;
 		secureErrorRetryDone = false;
 		secureErrorFirstSeenAtMs = 0L;
-		googleRejectedAutoHandled = false;
 	}
 
 	private static void executeSpotifyCompatScript(MCEFBrowser targetBrowser, String currentUrl) {
@@ -1968,14 +1966,6 @@ public class YouTubeBrowserScreen extends Screen {
 		refreshNavigationState();
 		if (browser != null) {
 			String currentUrl = browser.getURL();
-			if (isGoogleSigninRejectedUrl(currentUrl)) {
-				if (!googleRejectedAutoHandled) {
-					googleRejectedAutoHandled = true;
-					browser.loadURL(DEFAULT_URL);
-				}
-				return;
-			}
-			googleRejectedAutoHandled = false;
 			if (isSecurityInterstitialUrl(currentUrl)) {
 				if (!secureErrorRetryDone && !lastSecureNavigationUrl.isBlank()) {
 					long now = System.currentTimeMillis();
