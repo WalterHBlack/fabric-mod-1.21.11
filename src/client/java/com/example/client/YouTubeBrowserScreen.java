@@ -100,6 +100,7 @@ public class YouTubeBrowserScreen extends Screen {
 	private static boolean secureErrorRetryDone;
 	private static long secureErrorFirstSeenAtMs;
 	private static boolean sessionLoaded;
+	private static boolean awaitingServiceSelection = true;
 
 	private final boolean showMainMenuButton;
 	private final String launchUrl;
@@ -162,7 +163,9 @@ public class YouTubeBrowserScreen extends Screen {
 		boolean firstOpenInSession = !hadSharedBrowserBeforeInit;
 		String currentUrl = browser.getURL();
 		boolean blankCurrentPage = currentUrl == null || currentUrl.isBlank() || BLANK_URL.equalsIgnoreCase(currentUrl);
-		boolean shouldKeepPickerVisible = firstOpenInSession || (!spotifyConnectModeActive && blankCurrentPage);
+		boolean shouldKeepPickerVisible = firstOpenInSession
+				|| awaitingServiceSelection
+				|| (!spotifyConnectModeActive && blankCurrentPage);
 		if (launchUrl != null && !launchUrl.isBlank()) {
 			String targetUrl = normalizeServiceUrl(launchUrl);
 			if (isSpotifyUrl(targetUrl) && !spotifyWarningSuppressed) {
@@ -171,6 +174,7 @@ public class YouTubeBrowserScreen extends Screen {
 			} else {
 				browser.loadURL(targetUrl);
 				lastClosedUrl = targetUrl;
+				awaitingServiceSelection = false;
 				saveSession();
 			}
 			servicePickerVisible = false;
@@ -233,6 +237,7 @@ public class YouTubeBrowserScreen extends Screen {
 			return;
 		}
 		url = normalizeServiceUrl(url);
+		awaitingServiceSelection = false;
 		if (!isSpotifyUrl(url)) {
 			setSpotifyConnectMode(false);
 		}
@@ -253,6 +258,7 @@ public class YouTubeBrowserScreen extends Screen {
 			return;
 		}
 		String normalized = normalizeServiceUrl(url);
+		awaitingServiceSelection = false;
 		if (!isSpotifyUrl(normalized)) {
 			setSpotifyConnectMode(false);
 		}
@@ -515,8 +521,12 @@ public class YouTubeBrowserScreen extends Screen {
 		} else if (sharedBrowserSoftClosed) {
 			sharedBrowserSoftClosed = false;
 			sharedBrowser.setWindowVisibility(true);
-			String restoreUrl = getSafeStartupUrl();
-			sharedBrowser.loadURL(restoreUrl);
+			if (awaitingServiceSelection) {
+				sharedBrowser.loadURL(BLANK_URL);
+			} else {
+				String restoreUrl = getSafeStartupUrl();
+				sharedBrowser.loadURL(restoreUrl);
+			}
 		}
 		applyBrowserZoomForUrl(sharedBrowser.getURL());
 		return sharedBrowser;
@@ -2098,6 +2108,9 @@ public class YouTubeBrowserScreen extends Screen {
 
 	private void setServicePickerVisible(boolean visible) {
 		servicePickerVisible = visible;
+		if (visible) {
+			awaitingServiceSelection = true;
+		}
 		if (chooseYouTubeButton != null) {
 			chooseYouTubeButton.visible = visible;
 		}
