@@ -2159,6 +2159,8 @@ public class YouTubeBrowserScreen extends Screen {
 				browserWidth,
 				browserHeight,
 				textureWidth,
+				textureHeight,
+				textureWidth,
 				textureHeight
 		);
 
