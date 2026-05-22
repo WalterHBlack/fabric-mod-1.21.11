@@ -115,9 +115,12 @@ public class YouTubeBrowserScreen extends Screen {
 	private Button spotifyWarningContinueButton;
 	private Button spotifyWarningDontShowAgainButton;
 	private Button spotifyWarningCancelButton;
+	private Button spotifyConnectOpenWebButton;
+	private Button spotifyConnectBackButton;
 	private boolean mediaDropdownOpen;
 	private boolean servicePickerVisible;
 	private boolean spotifyWarningVisible;
+	private static boolean spotifyConnectModeActive;
 	private static boolean spotifyWarningSuppressed;
 	private String spotifyWarningTargetUrl;
 	private int spotifyCompatForegroundTicker;
@@ -218,6 +221,9 @@ public class YouTubeBrowserScreen extends Screen {
 			return;
 		}
 		url = normalizeServiceUrl(url);
+		if (!isSpotifyUrl(url)) {
+			setSpotifyConnectMode(false);
+		}
 		recordSecureNavigationTarget(url);
 		browser.loadURL(url);
 		persistLastUrlIfValid(url);
@@ -235,6 +241,9 @@ public class YouTubeBrowserScreen extends Screen {
 			return;
 		}
 		String normalized = normalizeServiceUrl(url);
+		if (!isSpotifyUrl(normalized)) {
+			setSpotifyConnectMode(false);
+		}
 		if (isSpotifyUrl(normalized) && !spotifyWarningSuppressed) {
 			setSpotifyWarningVisible(true, normalized);
 			return;
@@ -1191,6 +1200,9 @@ public class YouTubeBrowserScreen extends Screen {
 	}
 
 	private static void performMediaAction(String action) {
+		if (spotifyConnectModeActive && ExampleModClient.triggerSystemMediaAction(action)) {
+			return;
+		}
 		if (hasManagedBrowser()) {
 			String currentUrl = sharedBrowser.getURL();
 			if (isSpotifyUrl(currentUrl) && ExampleModClient.triggerSystemMediaAction(action)) {
@@ -1881,6 +1893,7 @@ public class YouTubeBrowserScreen extends Screen {
 
 		initServicePickerWidgets();
 		initSpotifyWarningWidgets();
+		initSpotifyConnectWidgets();
 	}
 
 	private void initServicePickerWidgets() {
@@ -1921,16 +1934,15 @@ public class YouTubeBrowserScreen extends Screen {
 		int panelTop = getBrowserY() + Math.max(8, (getBrowserHeight() - 148) / 2 - 10);
 
 		spotifyWarningContinueButton = addRenderableWidget(
-				Button.builder(Component.literal("Continue"), button -> {
-					String target = spotifyWarningTargetUrl == null || spotifyWarningTargetUrl.isBlank() ? SPOTIFY_URL : spotifyWarningTargetUrl;
+				Button.builder(Component.literal("Connect Mode"), button -> {
 					setSpotifyWarningVisible(false, null);
-					navigateToServiceInternal(target);
+					setSpotifyConnectMode(true);
 				})
 						.bounds(panelLeft + 12, panelTop + 112, 114, 20)
 						.build()
 		);
 		spotifyWarningDontShowAgainButton = addRenderableWidget(
-				Button.builder(Component.literal("Don't show again"), button -> {
+				Button.builder(Component.literal("Web (Exp)"), button -> {
 					spotifyWarningSuppressed = true;
 					saveSession();
 					String target = spotifyWarningTargetUrl == null || spotifyWarningTargetUrl.isBlank() ? SPOTIFY_URL : spotifyWarningTargetUrl;
@@ -1954,6 +1966,29 @@ public class YouTubeBrowserScreen extends Screen {
 						.build()
 		);
 		setSpotifyWarningVisible(spotifyWarningVisible, spotifyWarningTargetUrl);
+	}
+
+	private void initSpotifyConnectWidgets() {
+		int panelWidth = 380;
+		int panelLeft = (width - panelWidth) / 2;
+		int panelTop = getBrowserY() + Math.max(8, (getBrowserHeight() - 148) / 2 - 10);
+		spotifyConnectOpenWebButton = addRenderableWidget(
+				Button.builder(Component.literal("Open Web (Exp)"), button -> {
+					setSpotifyConnectMode(false);
+					navigateToServiceInternal(SPOTIFY_URL);
+				})
+						.bounds(panelLeft + 12, panelTop + 112, 164, 20)
+						.build()
+		);
+		spotifyConnectBackButton = addRenderableWidget(
+				Button.builder(Component.literal("Back"), button -> {
+					setSpotifyConnectMode(false);
+					setServicePickerVisible(true);
+				})
+						.bounds(panelLeft + panelWidth - 126, panelTop + 112, 114, 20)
+						.build()
+		);
+		setSpotifyConnectMode(spotifyConnectModeActive);
 	}
 
 	private void setMediaDropdownVisible(boolean visible) {
@@ -1998,6 +2033,7 @@ public class YouTubeBrowserScreen extends Screen {
 		if (visible) {
 			setMediaDropdownVisible(false);
 			setServicePickerVisible(false);
+			setSpotifyConnectMode(false);
 		}
 		if (spotifyWarningContinueButton != null) {
 			spotifyWarningContinueButton.visible = visible;
@@ -2007,6 +2043,27 @@ public class YouTubeBrowserScreen extends Screen {
 		}
 		if (spotifyWarningCancelButton != null) {
 			spotifyWarningCancelButton.visible = visible;
+		}
+	}
+
+	private void setSpotifyConnectMode(boolean active) {
+		spotifyConnectModeActive = active;
+		if (active) {
+			setMediaDropdownVisible(false);
+			setServicePickerVisible(false);
+			spotifyWarningVisible = false;
+			if (browser != null) {
+				browser.loadURL(BLANK_URL);
+			}
+			if (urlBox != null) {
+				urlBox.setValue("Spotify Connect Mode");
+			}
+		}
+		if (spotifyConnectOpenWebButton != null) {
+			spotifyConnectOpenWebButton.visible = active;
+		}
+		if (spotifyConnectBackButton != null) {
+			spotifyConnectBackButton.visible = active;
 		}
 	}
 
@@ -2090,7 +2147,9 @@ public class YouTubeBrowserScreen extends Screen {
 			if (Math.abs(currentMultiplier - browserViewportMultiplier) > 0.001D) {
 				resizeBrowser();
 			}
-			if (servicePickerVisible) {
+			if (spotifyConnectModeActive) {
+				urlBox.setValue("Spotify Connect Mode");
+			} else if (servicePickerVisible) {
 				urlBox.setValue("Choose a service");
 			} else if (currentUrl != null && !currentUrl.isBlank() && !currentUrl.equals(urlBox.getValue())) {
 				urlBox.setValue(currentUrl);
@@ -2242,6 +2301,25 @@ public class YouTubeBrowserScreen extends Screen {
 			}
 			if (spotifyWarningCancelButton != null) {
 				spotifyWarningCancelButton.render(guiGraphics, mouseX, mouseY, delta);
+			}
+		}
+
+		if (spotifyConnectModeActive) {
+			int panelWidth = 380;
+			int panelHeight = 148;
+			int panelLeft = (width - panelWidth) / 2;
+			int panelTop = getBrowserY() + Math.max(8, (getBrowserHeight() - panelHeight) / 2 - 10);
+			guiGraphics.fill(getBrowserX(), getBrowserY(), getBrowserX() + browserWidth, getBrowserY() + browserHeight, 0xCC101010);
+			MediaUi.panel(guiGraphics, panelLeft, panelTop, panelWidth, panelHeight);
+			guiGraphics.drawCenteredString(font, Component.literal("Spotify Connect Mode"), panelLeft + (panelWidth / 2), panelTop + 10, MediaUi.TITLE);
+			guiGraphics.drawCenteredString(font, Component.literal("Play music from Spotify app on your phone or PC."), panelLeft + (panelWidth / 2), panelTop + 31, MediaUi.TEXT);
+			guiGraphics.drawCenteredString(font, Component.literal("Media keys/buttons in this mod will control that app."), panelLeft + (panelWidth / 2), panelTop + 47, MediaUi.MUTED_TEXT);
+			guiGraphics.drawCenteredString(font, Component.literal("This mode is stable and bypasses web DRM issues."), panelLeft + (panelWidth / 2), panelTop + 61, MediaUi.MUTED_TEXT);
+			if (spotifyConnectOpenWebButton != null) {
+				spotifyConnectOpenWebButton.render(guiGraphics, mouseX, mouseY, delta);
+			}
+			if (spotifyConnectBackButton != null) {
+				spotifyConnectBackButton.render(guiGraphics, mouseX, mouseY, delta);
 			}
 		}
 
