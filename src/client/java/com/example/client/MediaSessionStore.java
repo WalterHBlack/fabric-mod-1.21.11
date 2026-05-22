@@ -10,6 +10,8 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 final class MediaSessionStore {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -48,5 +50,6 @@ final class MediaSessionStore {
 	static final class Session {
 		String lastUrl = "https://www.youtube.com";
 		boolean spotifyWarningSuppressed = false;
+		Map<String, Double> siteZoomLevels = new HashMap<>();
 	}
 }

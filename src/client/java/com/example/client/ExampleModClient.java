@@ -59,10 +59,10 @@ public class ExampleModClient implements ClientModInitializer {
 			new KeyMapping("key.modid.toggle_media_share", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KeyMapping.Category.MISC)
 	);
 	private static final KeyMapping BROWSER_ZOOM_IN_KEY = KeyBindingHelper.registerKeyBinding(
-			new KeyMapping("key.modid.browser_zoom_in", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_EQUAL, KeyMapping.Category.MISC)
+			new KeyMapping("key.modid.browser_zoom_in", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, KeyMapping.Category.MISC)
 	);
 	private static final KeyMapping BROWSER_ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(
-			new KeyMapping("key.modid.browser_zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, KeyMapping.Category.MISC)
+			new KeyMapping("key.modid.browser_zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, KeyMapping.Category.MISC)
 	);
 	private static boolean previousMediaDown;
 	private static boolean playPauseMediaDown;

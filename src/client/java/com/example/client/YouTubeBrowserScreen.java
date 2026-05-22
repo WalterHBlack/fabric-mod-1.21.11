@@ -57,6 +57,7 @@ public class YouTubeBrowserScreen extends Screen {
 	private static final double BROWSER_ZOOM_MIN_LEVEL = -3.0D;
 	private static final double BROWSER_ZOOM_MAX_LEVEL = 3.0D;
 	private static final double BROWSER_ZOOM_STEP = 0.25D;
+	private static final String DEFAULT_ZOOM_SITE_KEY = "default";
 	private static final String DEFAULT_URL = YOUTUBE_URL;
 	private static final String BLANK_URL = "about:blank";
 	private static final int BACKGROUND_KEEP_ALIVE_INTERVAL_TICKS = 40;
@@ -89,7 +90,8 @@ public class YouTubeBrowserScreen extends Screen {
 	private static int browserPixelWidth = -1;
 	private static int browserPixelHeight = -1;
 	private static double browserViewportMultiplier = 1.0D;
-	private static double browserZoomLevel = 0.0D;
+	private static final Map<String, Double> browserZoomLevelsBySite = new HashMap<>();
+	private static String activeZoomSiteKey = DEFAULT_ZOOM_SITE_KEY;
 	private static long spotifyCompatLastInjectMs;
 	private static boolean backgroundLowPowerApplied;
 	private static int backgroundLowPowerPixelWidth = -1;
@@ -150,13 +152,17 @@ public class YouTubeBrowserScreen extends Screen {
 			onClose();
 			return;
 		}
-		boolean reopenedFromSoftClose = sharedBrowserSoftClosed || sharedBrowser == null;
+		boolean hadSharedBrowserBeforeInit = sharedBrowser != null;
 		boolean showSpotifyWarningOnInit = false;
 		browser = getOrCreateSharedBrowser();
 		if (browser == null) {
 			onClose();
 			return;
 		}
+		boolean firstOpenInSession = !hadSharedBrowserBeforeInit;
+		String currentUrl = browser.getURL();
+		boolean blankCurrentPage = currentUrl == null || currentUrl.isBlank() || BLANK_URL.equalsIgnoreCase(currentUrl);
+		boolean shouldKeepPickerVisible = firstOpenInSession || (!spotifyConnectModeActive && blankCurrentPage);
 		if (launchUrl != null && !launchUrl.isBlank()) {
 			String targetUrl = normalizeServiceUrl(launchUrl);
 			if (isSpotifyUrl(targetUrl) && !spotifyWarningSuppressed) {
@@ -168,8 +174,10 @@ public class YouTubeBrowserScreen extends Screen {
 				saveSession();
 			}
 			servicePickerVisible = false;
-		} else if (reopenedFromSoftClose) {
-			browser.loadURL(BLANK_URL);
+		} else if (shouldKeepPickerVisible) {
+			if (firstOpenInSession) {
+				browser.loadURL(BLANK_URL);
+			}
 			servicePickerVisible = true;
 		} else {
 			servicePickerVisible = false;
@@ -297,12 +305,17 @@ public class YouTubeBrowserScreen extends Screen {
 			lastClosedUrl = session.lastUrl;
 		}
 		spotifyWarningSuppressed = session.spotifyWarningSuppressed;
+		browserZoomLevelsBySite.clear();
+		if (session.siteZoomLevels != null && !session.siteZoomLevels.isEmpty()) {
+			browserZoomLevelsBySite.putAll(session.siteZoomLevels);
+		}
 	}
 
 	private static void saveSession() {
 		MediaSessionStore.Session session = new MediaSessionStore.Session();
 		session.lastUrl = lastClosedUrl == null || lastClosedUrl.isBlank() ? DEFAULT_URL : lastClosedUrl;
 		session.spotifyWarningSuppressed = spotifyWarningSuppressed;
+		session.siteZoomLevels = new HashMap<>(browserZoomLevelsBySite);
 		MediaSessionStore.save(session);
 	}
 
@@ -505,31 +518,79 @@ public class YouTubeBrowserScreen extends Screen {
 			String restoreUrl = getSafeStartupUrl();
 			sharedBrowser.loadURL(restoreUrl);
 		}
-		applyBrowserZoomLevel();
+		applyBrowserZoomForUrl(sharedBrowser.getURL());
 		return sharedBrowser;
 	}
 
-	private static void applyBrowserZoomLevel() {
+	private static String zoomSiteKeyForUrl(String url) {
+		if (url == null || url.isBlank() || BLANK_URL.equalsIgnoreCase(url)) {
+			return DEFAULT_ZOOM_SITE_KEY;
+		}
+		String lower = url.toLowerCase(Locale.ROOT);
+		if (lower.contains("music.youtube.com")) {
+			return "ytmusic";
+		}
+		if (lower.contains("youtube.com")) {
+			return "youtube";
+		}
+		if (lower.contains("open.spotify.com") || lower.contains("play.spotify.com")) {
+			return "spotify";
+		}
+		if (lower.contains("music.apple.com")) {
+			return "applemusic";
+		}
+		try {
+			URI uri = new URI(url);
+			String host = uri.getHost();
+			if (host != null && !host.isBlank()) {
+				return host.toLowerCase(Locale.ROOT);
+			}
+		} catch (URISyntaxException ignored) {
+		}
+		return DEFAULT_ZOOM_SITE_KEY;
+	}
+
+	private static double zoomLevelForSiteKey(String siteKey) {
+		if (siteKey == null || siteKey.isBlank()) {
+			return 0.0D;
+		}
+		return browserZoomLevelsBySite.getOrDefault(siteKey, 0.0D);
+	}
+
+	private static void applyBrowserZoomLevel(double zoomLevel) {
 		if (!hasManagedBrowser()) {
 			return;
 		}
 		try {
-			sharedBrowser.setZoomLevel(browserZoomLevel);
+			sharedBrowser.setZoomLevel(zoomLevel);
 		} catch (Throwable ignored) {
 		}
 	}
 
-	private static int browserZoomPercent() {
-		return (int) Math.round(Math.pow(1.2D, browserZoomLevel) * 100.0D);
+	private static void applyBrowserZoomForUrl(String url) {
+		String siteKey = zoomSiteKeyForUrl(url);
+		activeZoomSiteKey = siteKey;
+		applyBrowserZoomLevel(zoomLevelForSiteKey(siteKey));
+	}
+
+	private static int browserZoomPercent(double zoomLevel) {
+		return (int) Math.round(Math.pow(1.2D, zoomLevel) * 100.0D);
 	}
 
 	public static String adjustBrowserZoom(boolean zoomIn) {
+		loadSessionIfNeeded();
+		String currentUrl = hasManagedBrowser() ? sharedBrowser.getURL() : null;
+		String siteKey = zoomSiteKeyForUrl(currentUrl);
+		double currentZoom = zoomLevelForSiteKey(siteKey);
 		double delta = zoomIn ? BROWSER_ZOOM_STEP : -BROWSER_ZOOM_STEP;
-		double next = browserZoomLevel + delta;
+		double next = currentZoom + delta;
 		next = Math.max(BROWSER_ZOOM_MIN_LEVEL, Math.min(BROWSER_ZOOM_MAX_LEVEL, next));
-		browserZoomLevel = Math.round(next * 100.0D) / 100.0D;
-		applyBrowserZoomLevel();
-		return "Browser zoom: " + browserZoomPercent() + "%";
+		double rounded = Math.round(next * 100.0D) / 100.0D;
+		browserZoomLevelsBySite.put(siteKey, rounded);
+		activeZoomSiteKey = siteKey;
+		saveSession();
+		applyBrowserZoomLevel(rounded);
+		return "Browser zoom: " + browserZoomPercent(rounded) + "%";
 	}
 
 	private static String normalizeServiceUrl(String url) {
@@ -2158,6 +2219,11 @@ public class YouTubeBrowserScreen extends Screen {
 		if (browser == null) {
 			return;
 		}
+		String currentUrl = browser.getURL();
+		String zoomSiteKey = zoomSiteKeyForUrl(currentUrl);
+		if (!zoomSiteKey.equals(activeZoomSiteKey)) {
+			applyBrowserZoomForUrl(currentUrl);
+		}
 
 		if (backButton != null) {
 			backButton.active = browser.canGoBack();
@@ -2170,7 +2236,6 @@ public class YouTubeBrowserScreen extends Screen {
 		}
 
 		if (urlBox != null && !urlBox.isFocused()) {
-			String currentUrl = browser.getURL();
 			double currentMultiplier = viewportMultiplierForUrl(currentUrl);
 			if (Math.abs(currentMultiplier - browserViewportMultiplier) > 0.001D) {
 				resizeBrowser();
