@@ -53,7 +53,7 @@ public class YouTubeBrowserScreen extends Screen {
 	private static final String YOUTUBE_MUSIC_URL = "https://music.youtube.com";
 	private static final String SPOTIFY_URL = "https://open.spotify.com";
 	private static final String APPLE_MUSIC_URL = "https://music.apple.com";
-	private static final double SPOTIFY_DESKTOP_LAYOUT_ZOOM = -2.0D;
+	private static final double SPOTIFY_VIEWPORT_MULTIPLIER = 2.2D;
 	private static final String DEFAULT_URL = YOUTUBE_URL;
 	private static final String BLANK_URL = "about:blank";
 	private static final int BACKGROUND_KEEP_ALIVE_INTERVAL_TICKS = 40;
@@ -83,9 +83,10 @@ public class YouTubeBrowserScreen extends Screen {
 	private static String mediaChangePopupTitleLine = "";
 	private static final Map<String, String> mediaTitleCache = new HashMap<>();
 	private static long mediaChangePopupHideAtMs;
+	private static int browserPixelWidth = -1;
+	private static int browserPixelHeight = -1;
+	private static double browserViewportMultiplier = 1.0D;
 	private static long spotifyCompatLastInjectMs;
-	private static boolean spotifyDesktopZoomApplied;
-	private static double spotifyDesktopZoomPreviousLevel;
 	private static boolean backgroundLowPowerApplied;
 	private static int backgroundLowPowerPixelWidth = -1;
 	private static int backgroundLowPowerPixelHeight = -1;
@@ -513,6 +514,10 @@ public class YouTubeBrowserScreen extends Screen {
 		return lower.contains("open.spotify.com") || lower.contains("play.spotify.com");
 	}
 
+	private static double viewportMultiplierForUrl(String url) {
+		return isSpotifyUrl(url) ? SPOTIFY_VIEWPORT_MULTIPLIER : 1.0D;
+	}
+
 	private static boolean isGoogleSigninRejectedUrl(String url) {
 		if (url == null || url.isBlank()) {
 			return false;
@@ -776,25 +781,6 @@ public class YouTubeBrowserScreen extends Screen {
 				currentUrl,
 				0
 		);
-	}
-
-	private static void applySpotifyDesktopZoomIfNeeded(MCEFBrowser targetBrowser, String currentUrl) {
-		if (targetBrowser == null) {
-			return;
-		}
-		if (isSpotifyUrl(currentUrl)) {
-			if (spotifyDesktopZoomApplied) {
-				return;
-			}
-			spotifyDesktopZoomPreviousLevel = targetBrowser.getZoomLevel();
-			targetBrowser.setZoomLevel(SPOTIFY_DESKTOP_LAYOUT_ZOOM);
-			spotifyDesktopZoomApplied = true;
-			return;
-		}
-		if (spotifyDesktopZoomApplied) {
-			targetBrowser.setZoomLevel(spotifyDesktopZoomPreviousLevel);
-			spotifyDesktopZoomApplied = false;
-		}
 	}
 
 	private static void applyBackgroundLowPowerResize(Minecraft client) {
@@ -1560,7 +1546,6 @@ public class YouTubeBrowserScreen extends Screen {
 			return;
 		}
 		String currentUrl = sharedBrowser.getURL();
-		applySpotifyDesktopZoomIfNeeded(sharedBrowser, currentUrl);
 		trackMediaChange(client, currentUrl);
 		boolean spotifyPage = isSpotifyUrl(currentUrl);
 		applyBackgroundLowPowerResize(client);
@@ -1653,10 +1638,6 @@ public class YouTubeBrowserScreen extends Screen {
 		if (sharedBrowser != null) {
 			String currentUrl = sharedBrowser.getURL();
 			persistLastUrlIfValid(currentUrl);
-			if (spotifyDesktopZoomApplied) {
-				sharedBrowser.setZoomLevel(spotifyDesktopZoomPreviousLevel);
-				spotifyDesktopZoomApplied = false;
-			}
 			sharedBrowser.executeJavaScript(
 					"""
 					for (const media of document.querySelectorAll('video, audio')) {
@@ -1689,6 +1670,9 @@ public class YouTubeBrowserScreen extends Screen {
 		mediaChangePopupTitleLine = "";
 		mediaTitleCache.clear();
 		mediaChangePopupHideAtMs = 0L;
+		browserPixelWidth = -1;
+		browserPixelHeight = -1;
+		browserViewportMultiplier = 1.0D;
 		saveSession();
 	}
 
@@ -1697,10 +1681,6 @@ public class YouTubeBrowserScreen extends Screen {
 		if (sharedBrowser != null) {
 			String currentUrl = sharedBrowser.getURL();
 			persistLastUrlIfValid(currentUrl);
-			if (spotifyDesktopZoomApplied) {
-				sharedBrowser.setZoomLevel(spotifyDesktopZoomPreviousLevel);
-				spotifyDesktopZoomApplied = false;
-			}
 			sharedBrowser.setFocus(false);
 			sharedBrowser.setWindowVisibility(false);
 			sharedBrowser.close();
@@ -1719,6 +1699,9 @@ public class YouTubeBrowserScreen extends Screen {
 		mediaChangePopupTitleLine = "";
 		mediaTitleCache.clear();
 		mediaChangePopupHideAtMs = 0L;
+		browserPixelWidth = -1;
+		browserPixelHeight = -1;
+		browserViewportMultiplier = 1.0D;
 		saveSession();
 	}
 
@@ -2027,16 +2010,21 @@ public class YouTubeBrowserScreen extends Screen {
 	}
 
 	private int mouseToBrowserX(double x) {
-		return (int) ((x - getBrowserX()) * minecraft.getWindow().getGuiScale());
+		return (int) ((x - getBrowserX()) * minecraft.getWindow().getGuiScale() * browserViewportMultiplier);
 	}
 
 	private int mouseToBrowserY(double y) {
-		return (int) ((y - getBrowserY()) * minecraft.getWindow().getGuiScale());
+		return (int) ((y - getBrowserY()) * minecraft.getWindow().getGuiScale() * browserViewportMultiplier);
 	}
 
 	private void resizeBrowser() {
 		if (browser != null) {
-			browser.resize((int) (getBrowserWidth() * minecraft.getWindow().getGuiScale()), (int) (getBrowserHeight() * minecraft.getWindow().getGuiScale()));
+			double guiScale = minecraft.getWindow().getGuiScale();
+			String currentUrl = browser.getURL();
+			browserViewportMultiplier = viewportMultiplierForUrl(currentUrl);
+			browserPixelWidth = Math.max(1, (int) Math.round(getBrowserWidth() * guiScale * browserViewportMultiplier));
+			browserPixelHeight = Math.max(1, (int) Math.round(getBrowserHeight() * guiScale * browserViewportMultiplier));
+			browser.resize(browserPixelWidth, browserPixelHeight);
 			backgroundLowPowerApplied = false;
 			backgroundLowPowerPixelWidth = -1;
 			backgroundLowPowerPixelHeight = -1;
@@ -2062,6 +2050,10 @@ public class YouTubeBrowserScreen extends Screen {
 
 		if (urlBox != null && !urlBox.isFocused()) {
 			String currentUrl = browser.getURL();
+			double currentMultiplier = viewportMultiplierForUrl(currentUrl);
+			if (Math.abs(currentMultiplier - browserViewportMultiplier) > 0.001D) {
+				resizeBrowser();
+			}
 			if (servicePickerVisible) {
 				urlBox.setValue("Choose a service");
 			} else if (currentUrl != null && !currentUrl.isBlank() && !currentUrl.equals(urlBox.getValue())) {
@@ -2102,7 +2094,6 @@ public class YouTubeBrowserScreen extends Screen {
 		refreshNavigationState();
 		if (browser != null) {
 			String currentUrl = browser.getURL();
-			applySpotifyDesktopZoomIfNeeded(browser, currentUrl);
 			if (isSecurityInterstitialUrl(currentUrl)) {
 				if (!secureErrorRetryDone && !lastSecureNavigationUrl.isBlank()) {
 					long now = System.currentTimeMillis();
@@ -2155,6 +2146,9 @@ public class YouTubeBrowserScreen extends Screen {
 
 		int browserWidth = getBrowserWidth();
 		int browserHeight = getBrowserHeight();
+		double guiScale = minecraft.getWindow().getGuiScale();
+		int textureWidth = browserPixelWidth > 0 ? Math.max(1, (int) Math.round(browserPixelWidth / guiScale)) : browserWidth;
+		int textureHeight = browserPixelHeight > 0 ? Math.max(1, (int) Math.round(browserPixelHeight / guiScale)) : browserHeight;
 		guiGraphics.blit(
 				RenderPipelines.GUI_TEXTURED,
 				texture,
@@ -2164,8 +2158,8 @@ public class YouTubeBrowserScreen extends Screen {
 				0.0F,
 				browserWidth,
 				browserHeight,
-				browserWidth,
-				browserHeight
+				textureWidth,
+				textureHeight
 		);
 
 		if (servicePickerVisible) {
