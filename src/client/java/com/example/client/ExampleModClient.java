@@ -72,6 +72,7 @@ public class ExampleModClient implements ClientModInitializer {
 	private static boolean toggleMediaShareDown;
 	private static boolean browserZoomInDown;
 	private static boolean browserZoomOutDown;
+	private static boolean suppressMediaHotkeysThisTick;
 	private static int pendingMouseRestoreTicks;
 	private static final int MENU_TAB_WIDTH = 52;
 	private static final int MENU_TAB_HEIGHT = 20;
@@ -255,6 +256,7 @@ public class ExampleModClient implements ClientModInitializer {
 	}
 
 	private static void processBrowserHotkeys(Minecraft client) {
+		suppressMediaHotkeysThisTick = false;
 		boolean openPressed = isOpenBrowserPressed(client);
 		boolean closePressed = isCloseBrowserPressed(client);
 		boolean zoomInPressed = isBrowserZoomInPressed(client);
@@ -274,9 +276,11 @@ public class ExampleModClient implements ClientModInitializer {
 		}
 		if (client.screen instanceof YouTubeBrowserScreen browserScreen && browserScreen.canHandleMediaHotkeys()) {
 			if (zoomInClicked || (zoomInPressed && !browserZoomInDown)) {
+				suppressMediaHotkeysThisTick = true;
 				showActionMessage(client, YouTubeBrowserScreen.adjustBrowserZoom(true));
 			}
 			if (zoomOutClicked || (zoomOutPressed && !browserZoomOutDown)) {
+				suppressMediaHotkeysThisTick = true;
 				showActionMessage(client, YouTubeBrowserScreen.adjustBrowserZoom(false));
 			}
 		}
@@ -703,6 +707,7 @@ public class ExampleModClient implements ClientModInitializer {
 			installSpotifyDesktopRequestOverrideIfNeeded();
 			YouTubeBrowserScreen.tickBackgroundPlayback();
 			MediaBridgeClient.tick(client);
+			suppressMediaHotkeysThisTick = false;
 			processBrowserHotkeys(client);
 			processShareHotkeys(client);
 			tickMouseRestore(client);
@@ -711,7 +716,7 @@ public class ExampleModClient implements ClientModInitializer {
 			if (client.screen instanceof YouTubeBrowserScreen browserScreen) {
 				hotkeysEnabled = browserScreen.canHandleMediaHotkeys();
 			}
-			processMediaHotkeys(client, hotkeysEnabled);
+			processMediaHotkeys(client, hotkeysEnabled && !suppressMediaHotkeysThisTick);
 		});
 		HudRenderCallback.EVENT.register((guiGraphics, tickCounter) -> {
 			Minecraft client = Minecraft.getInstance();
