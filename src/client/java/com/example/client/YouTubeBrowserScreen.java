@@ -54,6 +54,9 @@ public class YouTubeBrowserScreen extends Screen {
 	private static final String SPOTIFY_URL = "https://open.spotify.com";
 	private static final String APPLE_MUSIC_URL = "https://music.apple.com";
 	private static final double SPOTIFY_VIEWPORT_MULTIPLIER = 2.2D;
+	private static final double BROWSER_ZOOM_MIN_LEVEL = -3.0D;
+	private static final double BROWSER_ZOOM_MAX_LEVEL = 3.0D;
+	private static final double BROWSER_ZOOM_STEP = 0.25D;
 	private static final String DEFAULT_URL = YOUTUBE_URL;
 	private static final String BLANK_URL = "about:blank";
 	private static final int BACKGROUND_KEEP_ALIVE_INTERVAL_TICKS = 40;
@@ -86,6 +89,7 @@ public class YouTubeBrowserScreen extends Screen {
 	private static int browserPixelWidth = -1;
 	private static int browserPixelHeight = -1;
 	private static double browserViewportMultiplier = 1.0D;
+	private static double browserZoomLevel = 0.0D;
 	private static long spotifyCompatLastInjectMs;
 	private static boolean backgroundLowPowerApplied;
 	private static int backgroundLowPowerPixelWidth = -1;
@@ -501,7 +505,31 @@ public class YouTubeBrowserScreen extends Screen {
 			String restoreUrl = getSafeStartupUrl();
 			sharedBrowser.loadURL(restoreUrl);
 		}
+		applyBrowserZoomLevel();
 		return sharedBrowser;
+	}
+
+	private static void applyBrowserZoomLevel() {
+		if (!hasManagedBrowser()) {
+			return;
+		}
+		try {
+			sharedBrowser.setZoomLevel(browserZoomLevel);
+		} catch (Throwable ignored) {
+		}
+	}
+
+	private static int browserZoomPercent() {
+		return (int) Math.round(Math.pow(1.2D, browserZoomLevel) * 100.0D);
+	}
+
+	public static String adjustBrowserZoom(boolean zoomIn) {
+		double delta = zoomIn ? BROWSER_ZOOM_STEP : -BROWSER_ZOOM_STEP;
+		double next = browserZoomLevel + delta;
+		next = Math.max(BROWSER_ZOOM_MIN_LEVEL, Math.min(BROWSER_ZOOM_MAX_LEVEL, next));
+		browserZoomLevel = Math.round(next * 100.0D) / 100.0D;
+		applyBrowserZoomLevel();
+		return "Browser zoom: " + browserZoomPercent() + "%";
 	}
 
 	private static String normalizeServiceUrl(String url) {

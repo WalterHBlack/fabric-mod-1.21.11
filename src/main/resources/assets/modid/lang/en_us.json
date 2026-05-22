@@ -5,5 +5,7 @@
   "key.modid.previous_video": "Previous Track/Video",
   "key.modid.play_pause_video": "Play/Pause Track/Video",
   "key.modid.next_video": "Next Track/Video",
-  "key.modid.toggle_media_share": "Toggle Media Share"
+  "key.modid.toggle_media_share": "Toggle Media Share",
+  "key.modid.browser_zoom_in": "Browser Zoom In",
+  "key.modid.browser_zoom_out": "Browser Zoom Out"
 }

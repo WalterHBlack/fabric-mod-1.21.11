@@ -58,12 +58,20 @@ public class ExampleModClient implements ClientModInitializer {
 	private static final KeyMapping TOGGLE_MEDIA_SHARE_KEY = KeyBindingHelper.registerKeyBinding(
 			new KeyMapping("key.modid.toggle_media_share", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KeyMapping.Category.MISC)
 	);
+	private static final KeyMapping BROWSER_ZOOM_IN_KEY = KeyBindingHelper.registerKeyBinding(
+			new KeyMapping("key.modid.browser_zoom_in", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_EQUAL, KeyMapping.Category.MISC)
+	);
+	private static final KeyMapping BROWSER_ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(
+			new KeyMapping("key.modid.browser_zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, KeyMapping.Category.MISC)
+	);
 	private static boolean previousMediaDown;
 	private static boolean playPauseMediaDown;
 	private static boolean nextMediaDown;
 	private static boolean openBrowserDown;
 	private static boolean closeBrowserDown;
 	private static boolean toggleMediaShareDown;
+	private static boolean browserZoomInDown;
+	private static boolean browserZoomOutDown;
 	private static int pendingMouseRestoreTicks;
 	private static final int MENU_TAB_WIDTH = 52;
 	private static final int MENU_TAB_HEIGHT = 20;
@@ -193,6 +201,14 @@ public class ExampleModClient implements ClientModInitializer {
 		return TOGGLE_MEDIA_SHARE_KEY.isDown() || isBindingDown(client, TOGGLE_MEDIA_SHARE_KEY);
 	}
 
+	private static boolean isBrowserZoomInPressed(Minecraft client) {
+		return BROWSER_ZOOM_IN_KEY.isDown() || isBindingDown(client, BROWSER_ZOOM_IN_KEY);
+	}
+
+	private static boolean isBrowserZoomOutPressed(Minecraft client) {
+		return BROWSER_ZOOM_OUT_KEY.isDown() || isBindingDown(client, BROWSER_ZOOM_OUT_KEY);
+	}
+
 	public static boolean isMediaControlKey(KeyEvent event) {
 		return PREVIOUS_VIDEO_KEY.matches(event)
 				|| PLAY_PAUSE_VIDEO_KEY.matches(event)
@@ -241,8 +257,12 @@ public class ExampleModClient implements ClientModInitializer {
 	private static void processBrowserHotkeys(Minecraft client) {
 		boolean openPressed = isOpenBrowserPressed(client);
 		boolean closePressed = isCloseBrowserPressed(client);
+		boolean zoomInPressed = isBrowserZoomInPressed(client);
+		boolean zoomOutPressed = isBrowserZoomOutPressed(client);
 		boolean openClicked = OPEN_BROWSER_KEY.consumeClick();
 		boolean closeClicked = CLOSE_BACKGROUND_BROWSER_KEY.consumeClick();
+		boolean zoomInClicked = BROWSER_ZOOM_IN_KEY.consumeClick();
+		boolean zoomOutClicked = BROWSER_ZOOM_OUT_KEY.consumeClick();
 		boolean allowOpenBrowserHotkey = client.screen == null || client.screen instanceof TitleScreen;
 		boolean allowCloseBrowserHotkey = client.screen == null || client.screen instanceof TitleScreen;
 
@@ -252,9 +272,19 @@ public class ExampleModClient implements ClientModInitializer {
 		if (allowCloseBrowserHotkey && (closeClicked || (closePressed && !closeBrowserDown))) {
 			closeBackgroundBrowser(client);
 		}
+		if (client.screen instanceof YouTubeBrowserScreen browserScreen && browserScreen.canHandleMediaHotkeys()) {
+			if (zoomInClicked || (zoomInPressed && !browserZoomInDown)) {
+				showActionMessage(client, YouTubeBrowserScreen.adjustBrowserZoom(true));
+			}
+			if (zoomOutClicked || (zoomOutPressed && !browserZoomOutDown)) {
+				showActionMessage(client, YouTubeBrowserScreen.adjustBrowserZoom(false));
+			}
+		}
 
 		openBrowserDown = openPressed;
 		closeBrowserDown = closePressed;
+		browserZoomInDown = zoomInPressed;
+		browserZoomOutDown = zoomOutPressed;
 	}
 
 	private static void processShareHotkeys(Minecraft client) {
