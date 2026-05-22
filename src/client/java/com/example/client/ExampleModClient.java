@@ -16,6 +16,13 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
+import org.cef.browser.CefBrowser;
+import org.cef.browser.CefFrame;
+import org.cef.handler.CefRequestHandlerAdapter;
+import org.cef.handler.CefResourceRequestHandler;
+import org.cef.handler.CefResourceRequestHandlerAdapter;
+import org.cef.misc.BoolRef;
+import org.cef.network.CefRequest;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
@@ -26,8 +33,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
 
 public class ExampleModClient implements ClientModInitializer {
@@ -64,6 +73,8 @@ public class ExampleModClient implements ClientModInitializer {
 	private static final int MENU_TAB_SPACING = 3;
 	private static final String WIDEVINE_DLL_NAME = "widevinecdm.dll";
 	private static final String WIDEVINE_HINT_FILE_NAME = "latest-component-updated-widevine-cdm";
+	private static final String SPOTIFY_DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+	private static boolean spotifyUaRequestHookInstalled;
 
 	public static void showActionMessage(Minecraft client, String message) {
 		if (client != null && client.player != null && message != null && !message.isBlank()) {
@@ -533,6 +544,56 @@ public class ExampleModClient implements ClientModInitializer {
 		}
 	}
 
+	private static boolean isSpotifyRequestUrl(String url) {
+		if (url == null || url.isBlank()) {
+			return false;
+		}
+		String lower = url.toLowerCase(Locale.ROOT);
+		return lower.contains("open.spotify.com")
+				|| lower.contains("spotifycdn.com")
+				|| lower.contains("scdn.co");
+	}
+
+	private static void installSpotifyDesktopRequestOverrideIfNeeded() {
+		if (spotifyUaRequestHookInstalled || !MCEF.isInitialized() || MCEF.getClient() == null || MCEF.getClient().getHandle() == null) {
+			return;
+		}
+		MCEF.getClient().getHandle().addRequestHandler(new CefRequestHandlerAdapter() {
+			@Override
+			public CefResourceRequestHandler getResourceRequestHandler(
+					CefBrowser browser,
+					CefFrame frame,
+					CefRequest request,
+					boolean isNavigation,
+					boolean isDownload,
+					String requestInitiator,
+					BoolRef disableDefaultHandling
+			) {
+				if (request == null || !isSpotifyRequestUrl(request.getURL())) {
+					return null;
+				}
+				return new CefResourceRequestHandlerAdapter() {
+					@Override
+					public boolean onBeforeResourceLoad(CefBrowser browser, CefFrame frame, CefRequest request) {
+						if (request == null || !isSpotifyRequestUrl(request.getURL())) {
+							return false;
+						}
+						Map<String, String> headers = new HashMap<>();
+						request.getHeaderMap(headers);
+						headers.put("User-Agent", SPOTIFY_DESKTOP_UA);
+						headers.put("Sec-CH-UA", "\"Chromium\";v=\"136\", \"Google Chrome\";v=\"136\", \"Not.A/Brand\";v=\"24\"");
+						headers.put("Sec-CH-UA-Mobile", "?0");
+						headers.put("Sec-CH-UA-Platform", "\"Windows\"");
+						request.setHeaderMap(headers);
+						return false;
+					}
+				};
+			}
+		});
+		spotifyUaRequestHookInstalled = true;
+		ExampleMod.LOGGER.info("Installed Spotify desktop request override handler.");
+	}
+
 	@Override
 	public void onInitializeClient() {
 		applyMcefPlaybackCompatibilitySettings();
@@ -609,6 +670,7 @@ public class ExampleModClient implements ClientModInitializer {
 		});
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			installSpotifyDesktopRequestOverrideIfNeeded();
 			YouTubeBrowserScreen.tickBackgroundPlayback();
 			MediaBridgeClient.tick(client);
 			processBrowserHotkeys(client);
