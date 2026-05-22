@@ -594,6 +594,42 @@ public class YouTubeBrowserScreen extends Screen {
 				    window.__mcSpotifyCompat = true;
 				    console.warn("[MC-Spotify] compat init");
 				
+				    // Reset/override known UI experiment hints that can stick to mobile-like shell.
+				    try {
+				      const wipeIfSuspicious = (store) => {
+				        if (!store) return;
+				        const toDelete = [];
+				        for (let i = 0; i < store.length; i++) {
+				          const key = store.key(i);
+				          if (!key) continue;
+				          const k = key.toLowerCase();
+				          if (k.includes("mobile")
+				              || k.includes("mweb")
+				              || k.includes("handheld")
+				              || k.includes("responsive")
+				              || k.includes("experiment")
+				              || k.includes("variant")
+				              || k.includes("xpui")) {
+				            toDelete.push(key);
+				          }
+				        }
+				        for (const key of toDelete) {
+				          try { store.removeItem(key); } catch (e) {}
+				        }
+				      };
+				      wipeIfSuspicious(window.localStorage);
+				      wipeIfSuspicious(window.sessionStorage);
+				      try { localStorage.setItem("ui.experience_override", "xpui"); } catch (e) {}
+				      try { localStorage.setItem("web-player.experience_override", "xpui"); } catch (e) {}
+				      try { localStorage.setItem("platform", "web"); } catch (e) {}
+				
+				      if (!sessionStorage.getItem("__mc_spotify_ui_reset_boot")) {
+				        sessionStorage.setItem("__mc_spotify_ui_reset_boot", "1");
+				        location.reload();
+				        return;
+				      }
+				    } catch (e) {}
+				
 				    // Spoof desktop chromium signals for Spotify's frontend gating.
 				    try {
 				      const desktopUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
